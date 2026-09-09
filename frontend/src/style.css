@@ -1,0 +1,62 @@
+/*
+  Global reset — replaces the default Vite scaffold style.css.
+  All application-level layout lives in App.vue and component <style scoped> blocks.
+*/
+
+/* ── Box model ───────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;  /* padding/border never add to total width */
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Root / mount point ──────────────────────────────────────────────────── */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;        /* the app manages its own scroll regions */
+}
+
+#app {
+  /* Full-bleed: flush to every edge, no centering, no side borders */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Typography baseline ─────────────────────────────────────────────────── */
+/* tokens.css (imported first in main.js) owns the design-token values;
+   this file just resets browser defaults for elements the app actually uses. */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: inherit;
+  font-size: inherit;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}

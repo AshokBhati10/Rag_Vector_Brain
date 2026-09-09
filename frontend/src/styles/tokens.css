@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Typography */
+  --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-size-xs: 11.5px;
+  --font-size-sm: 12.5px;
+  --font-size-md: 14px;
+  --font-size-lg: 15px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 18px;
+  --font-size-3xl: 22px;
+  --font-size-4xl: 26px;
+
+  --font-weight-base: 400;
+  --line-height-base: 1.55;
+
+  /* Text — dark charcoal, never pure black */
+  --color-text-primary: #2e2c28;
+  --color-text-secondary: #1f1e1b;
+  --color-text-tertiary: #6f6c64;
+  --color-text-inverse: #8a877e;
+
+  /* Surfaces — warm cream page, white cards */
+  --color-surface-base: #f6f2e9;
+  --color-surface-muted: #efe9db;
+  --color-surface-raised: #ffffff;
+  --color-surface-tint: #fbf9f3;
+
+  /* Primary accent — muted forest / sage green */
+  --accent: #4a6b4f;
+  --accent-strong: #3c5941;
+  --accent-soft: #e7efe4;
+  --accent-text: #ffffff;
+
+  /* Borders & shadows */
+  --color-border: #e3dcc9;
+  --shadow-sm: 0 1px 2px rgba(62, 52, 32, 0.06);
+  --shadow-md: 0 4px 14px rgba(62, 52, 32, 0.08);
+
+  /* Danger */
+  --color-danger: #b3402e;
+  --color-danger-soft: #f9e9e4;
+
+  /* Spacing */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 18px;
+
+  /* Radius */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-2xl: 50px;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --motion-instant: 150ms;
+  --motion-fast: 200ms;
+  --motion-normal: 280ms;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-base);
+  line-height: var(--line-height-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-base);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+* {
+  box-sizing: inherit;
+}
