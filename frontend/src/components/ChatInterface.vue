@@ -45,7 +45,15 @@
             <span class="ai-name">VectorBrain</span>
             <span v-if="msg.createdAt" class="stamp">{{ formatTime(msg.createdAt) }}</span>
           </div>
-          <div class="answer-body assistant-markdown" v-html="renderMarkdown(resolvedContent(msg))"></div>
+          <div class="answer-body assistant-markdown" v-html="renderAnswer(msg)"></div>
+          <div v-if="visibleSources(msg).length > 0" class="sources-box">
+            <p class="sources-title">Sources</p>
+            <ul class="sources-list">
+              <li v-for="(name, idx) in visibleSources(msg)" :key="idx">
+                {{ name }}
+              </li>
+            </ul>
+          </div>
           <div v-if="msg.cached" class="cached-badge">Served from semantic cache</div>
         </div>
       </div>
@@ -175,69 +183,72 @@ function renderMarkdown(text) {
   return md.render(text);
 }
 
-/**
- * TARGETED FIX: the LLM copies the prompt's "[Document, p. N]" placeholder
- * pattern, producing generic markers instead of real filenames. Resolve each
- * marker against the backend `sources` metadata (nothing is hardcoded):
- *
- * Variant 1  "[Document, p. N]"      -> filename of the source with page N.
- * Variant 2  "[Document(:) <name>, p. N]" (stray "Document"/"Document:" prefix
- *            + real name copied from the SOURCE block) -> verified against
- *            backend sources (whitespace/dash-insensitive) and normalized
- *            to the canonical entry.
- * Variant 3  "[Source K, p. N]" (model cites the prompt's SOURCE block number
- *            instead of the filename) -> sources[K-1], because the prompt
- *            numbers context blocks SOURCE 1..5 in retrieval order and the
- *            backend `sources` array preserves that order. The index hit is
- *            only used when its page equals the marker's page (this guards
- *            against shifts when duplicate chunks were deduped); otherwise
- *            fall back to a unique page match, else leave the marker alone.
- *
- * Rules: no page/name match -> marker left untouched (never invent data).
- * Same page in several sources -> first source in retrieval order wins.
- * Markers the model already wrote correctly are untouched.
- */
-function resolveCitationFilenames(content, sourceList) {
-  if (!content || !Array.isArray(sourceList) || sourceList.length === 0) return content || '';
-  const norm = (s) => String(s)
-    .replace(/[‐‑‒–—―−]/g, '-')  // unicode dashes (e.g. U+2011) -> ASCII hyphen
-    .replace(/\s+/g, ' ')
-    .trim();
-  // The model emits markers with ASCII [...] or CJK 【...】 brackets.
-  const OPEN = '[\\[\\u3010]';
-  const CLOSE = '[\\]\\u3011]';
-  let out = content.replace(new RegExp(OPEN + 'Document\\s*,\\s*p\\.\\s*(\\d+)' + CLOSE, 'g'), (marker, pageStr) => {
-    const page = Number(pageStr);
-    const hit = sourceList.find((s) => Number(s.page) === page);
-    if (!hit || !hit.filename) return marker;
-    return `[${hit.filename}, p. ${page}]`;
-  });
-  out = out.replace(new RegExp(OPEN + 'Document\\s*:?\\s+([^\\[\\]\\u3010\\u3011]+?),\\s*p\\.\\s*(\\d+)' + CLOSE, 'g'), (marker, name, pageStr) => {
-    const page = Number(pageStr);
-    const hit = sourceList.find((s) => norm(s.filename) === norm(name) && Number(s.page) === page);
-    if (!hit) return marker;
-    return `[${hit.filename}, p. ${hit.page}]`;
-  });
-  out = out.replace(new RegExp(OPEN + 'Source\\s+(\\d+)\\s*,\\s*p\\.\\s*(\\d+)' + CLOSE, 'g'), (marker, kStr, pageStr) => {
-    const idx = Number(kStr) - 1;  // prompt numbers SOURCE blocks from 1
-    const page = Number(pageStr);
-    let hit = (idx >= 0 && idx < sourceList.length && Number(sourceList[idx].page) === page)
-      ? sourceList[idx]
-      : null;
-    if (!hit) {
-      const cands = sourceList.filter((s) => Number(s.page) === page);
-      hit = cands.length === 1 ? cands[0] : null;
-    }
-    if (!hit || !hit.filename) return marker;
-    return `[${hit.filename}, p. ${hit.page}]`;
-  });
-  return out;
+// NOTE on citations: the backend prompt instructs the model to cite real
+// "[filename, p. N]" metadata. The display transform below NEVER invents
+// identity — a marker is restyled only when its (filename, page) pair matches
+// the verified backend `sources` array exactly; anything else (or missing
+// metadata) renders untouched. Filenames/pages always come from SOURCE data.
+//
+// Consistency: the model nondeterministically varies marker *syntax* (ASCII
+// vs CJK brackets, "p." vs "P.", optional dot). The pattern below accepts all
+// syntax variants but the verified-set gate is unchanged and exact, so every
+// verified citation renders through the same chip component while fabricated
+// markers still render as plain text.
+function unescapeHtml(s) {
+  return String(s)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 }
 
-function resolvedContent(msg) {
-  return resolveCitationFilenames(msg.content, msg.sources);
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
+function renderAnswer(msg) {
+  const html = renderMarkdown(msg.content);
+  const src = Array.isArray(msg.sources) ? msg.sources : [];
+  if (src.length === 0) return html;
+  const verified = new Set(
+    src
+      .filter((s) => s && s.filename != null)
+      .map((s) => `${s.filename}|||${Number(s.page)}`)
+  );
+  // Transform text segments only — never restyle code blocks/pre content.
+  return html
+    .split(/(<pre>.*?<\/pre>|<code>.*?<\/code>)/gs)
+    .map((seg, i) => {
+      if (i % 2 === 1) return seg;
+      return seg.replace(/[\[【]([^<>\[\]【】]+?),\s*[pP]\.?\s*(\d+)\s*[\]】]/g, (marker, name, pg) => {
+        const clean = unescapeHtml(name.trim());
+        const page = Number(pg);
+        if (!verified.has(`${clean}|||${page}`)) return marker;
+        // Chip shows filename + compact page ref only (no brackets, no "p.").
+        // Page stays verified metadata; full name is kept in the tooltip.
+        const safe = escapeHtml(clean);
+        return `<span class="cite" title="${safe}, page ${page}">${safe}, P-${page}</span>`;
+      });
+    })
+    .join('');
+}
+
+// Sources list shows verified filenames only (no page numbers — those live
+// next to the answer text). Entries without a filename are skipped, never
+// fabricated.
+function visibleSources(msg) {
+  if (!Array.isArray(msg.sources)) return [];
+  const names = [];
+  for (const s of msg.sources) {
+    if (s && s.filename && !names.includes(s.filename)) names.push(s.filename);
+  }
+  return names;
+}
 function formatTime(iso) {
   try {
     const d = new Date(iso);
@@ -462,6 +473,47 @@ function retry(msg) {
   color: var(--color-text-primary);
   word-break: break-word;
   min-width: 0;
+}
+
+.sources-box {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.sources-title {
+  margin: 0 0 6px 0;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.sources-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+/* Inline citation chip: compact rounded pill in a neutral warm-gray that is
+   clearly distinct from normal text, browser selection blue, code blocks,
+   and the green accent. Secondary to the answer, never button-like. */
+.assistant-markdown :deep(.cite) {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: baseline;
+  color: #6b6455;
+  background: #f1efe9;
+  border: 1px solid #e2ded4;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
 }
 
 .cached-badge {

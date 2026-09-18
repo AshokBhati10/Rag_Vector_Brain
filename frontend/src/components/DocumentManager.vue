@@ -134,7 +134,11 @@
 
         <div v-if="!collapsed" class="doc-body">
           <div class="doc-name" :title="doc.filename">{{ doc.filename }}</div>
-          <div class="doc-sub">{{ doc.total_pages }} pages • {{ formatSize(doc.file_size_kb) }}</div>
+          <div v-if="isFailed(doc)" class="doc-sub failed" :title="doc.error_message || 'Processing failed'">
+            Failed — {{ shortError(doc) }}
+          </div>
+          <div v-else-if="isProcessing(doc)" class="doc-sub uploading">Processing…</div>
+          <div v-else class="doc-sub">{{ doc.total_pages }} pages • {{ formatSize(doc.file_size_kb) }}</div>
         </div>
 
         <div v-if="!collapsed" class="menu-wrap" @mouseleave="openMenuId = null">
@@ -232,6 +236,21 @@ function formatSize(kb) {
     return `${(kb / 1024).toFixed(1)} MB`;
   }
   return `${kb} KB`;
+}
+
+// Background-ingestion status (set by the Celery pipeline; rows without a
+// status predate the queue and are treated as completed).
+function isProcessing(doc) {
+  return !!doc && !!doc.status && doc.status !== 'completed' && doc.status !== 'failed';
+}
+
+function isFailed(doc) {
+  return !!doc && doc.status === 'failed';
+}
+
+function shortError(doc) {
+  const msg = (doc && doc.error_message) || 'Processing failed';
+  return msg.length > 80 ? msg.slice(0, 80) + '…' : msg;
 }
 
 function showError(msg) {
@@ -584,6 +603,14 @@ function toggleSelectAll() {
   color: var(--accent-strong);
   font-weight: 600;
   animation: pulse 1.5s infinite;
+}
+
+.doc-sub.failed {
+  color: var(--color-danger);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .menu-wrap {

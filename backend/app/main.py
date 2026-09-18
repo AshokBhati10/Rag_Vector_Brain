@@ -6,16 +6,23 @@ from sqlalchemy import text
 
 from app.db.init_db import init_db
 from app.db.session import engine
+from app.routers import auth as auth_router
 from app.routers import chat as chat_router
 from app.routers import upload
 from app.routers import documents as documents_router
 from app.routers import notebooks as notebooks_router
+from seed_users import seed_demo_users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run init_db on startup to ensure schema exists."""
+    """Run init_db on startup to ensure schema exists, then seed demo logins."""
     init_db()
+    try:
+        seed_demo_users()
+    except Exception as e:
+        # Auth seeding must never prevent the API from starting.
+        print(f"[SEED] Demo-user seeding skipped: {e}")
     yield
 
 
@@ -31,6 +38,7 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth_router.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
 app.include_router(chat_router.router, prefix="/api")
 app.include_router(documents_router.router, prefix="/api")

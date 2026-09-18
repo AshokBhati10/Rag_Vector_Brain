@@ -22,8 +22,14 @@ dist/
 dist-ssr/
 *.local
 
+# Uploaded PDFs pending/in-process ingestion (runtime storage)
+backend/uploads/
+
 # IDEs and OS files
 .vscode/
 .idea/
 .DS_Store
 *.log
+
+# Project recordings
+Vector_Brain_Recording.mp4

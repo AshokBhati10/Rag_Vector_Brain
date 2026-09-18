@@ -1,11 +1,37 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- ── Users (simple multi-user login) ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+    id            SERIAL PRIMARY KEY,
+    username      VARCHAR(64) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at    TIMESTAMP DEFAULT now()
+);
+
 -- ── Notebooks ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notebooks (
     id         SERIAL PRIMARY KEY,
     name       VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT now()
 );
+
+-- Migration-safe: associate notebooks with a user
+ALTER TABLE notebooks
+    ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS notebooks_user_idx
+    ON notebooks(user_id);
+
+-- ── Sessions (opaque cookie-session tokens) ───────────────────────────────
+CREATE TABLE IF NOT EXISTS sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT now(),
+    expires_at TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS sessions_user_idx
+    ON sessions(user_id);
 
 -- ── Documents ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS documents (
@@ -19,6 +45,15 @@ CREATE TABLE IF NOT EXISTS documents (
 -- Migration-safe: add notebook_id to documents if not already present
 ALTER TABLE documents
     ADD COLUMN IF NOT EXISTS notebook_id INT REFERENCES notebooks(id) ON DELETE CASCADE;
+
+-- Migration-safe: async ingestion state for the RabbitMQ + Celery pipeline.
+-- Existing rows default to 'completed' so old uploads keep working.
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'completed';
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS error_message TEXT;
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS file_path TEXT;
 
 -- ── Chunks ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS chunks (

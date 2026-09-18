@@ -20,6 +20,28 @@ EMBEDDING_DIM = 384
 # ---------------------------------------------------------------------------
 _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 _tokenizer = tiktoken.get_encoding("cl100k_base")
+_converter: DocumentConverter | None = None
+
+
+def _get_converter() -> DocumentConverter:
+    """Lazily build (once) and reuse the Docling PDF converter.
+
+    Constructing a DocumentConverter initializes the whole PDF pipeline, which
+    takes tens of seconds. Building it per upload pushed normal ingestions
+    past the reverse-proxy read timeout, so the proxy returned 504 while the
+    backend still committed — the client showed "Upload failed" even though
+    the document landed in the database. Parsing behavior is unchanged.
+    """
+    global _converter
+    if _converter is None:
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.do_ocr = False
+        _converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+        )
+    return _converter
 
 
 # ---------------------------------------------------------------------------
@@ -33,15 +55,7 @@ def parse_pdf(file_bytes: bytes) -> list[dict]:
         tmp_path = tmp.name
 
     try:
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = False
-
-        converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-            }
-        )
-        result = converter.convert(tmp_path)
+        result = _get_converter().convert(tmp_path)
         doc = result.document
 
         pages_dict: dict[int, list[str]] = {}

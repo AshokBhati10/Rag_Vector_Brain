@@ -45,7 +45,13 @@ def build_prompt(question: str, retrieved_chunks: list[dict]) -> str:
     return (
         "You are a research assistant. Answer the user's question using ONLY "
         "the retrieved sources provided below. Do not use any outside knowledge. "
-        "When you use information from a source, cite it as [Document, p. N].\n\n"
+        "When you use information from a source, cite it with the ACTUAL "
+        "document filename and page number from that source's metadata, "
+        "exactly in the form [filename, p. N] — for example, if SOURCE 1 has "
+        "Document: report.pdf and Page: 3, cite it as [report.pdf, p. 3]. "
+        "Use plain ASCII square brackets. "
+        "Never use generic placeholders like [Document, p. N] or "
+        "[Source 1, p. N]; always use the real filename.\n\n"
 
         "If the sources do not contain enough information to answer, "
         "respond exactly with:\n"

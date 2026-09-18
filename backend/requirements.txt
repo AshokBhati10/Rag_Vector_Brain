@@ -5,6 +5,7 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 python-multipart
+celery
 docling
 sentence-transformers
 tiktoken

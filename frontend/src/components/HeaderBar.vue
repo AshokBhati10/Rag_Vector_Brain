@@ -15,36 +15,32 @@
     </div>
 
     <nav class="topnav" aria-label="Primary">
-      <button class="nav-item is-active" @click="$emit('nav-chat')">
-        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-        Chat
-      </button>
-      <button class="nav-item" @click="$emit('nav-notebook')">
-        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-        </svg>
-        My Notebook
-      </button>
-      <button class="nav-item" @click="$emit('nav-documents')">
-        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
-        Documents
-      </button>
-      <span class="nav-divider" aria-hidden="true"></span>
       <button class="new-nb-btn" @click="promptCreateNotebook" title="Create a new notebook">
         <span class="plus-icon" aria-hidden="true">+</span> New Notebook
       </button>
     </nav>
 
-    <!-- Right column intentionally empty: the single centered nav is the
-         only control group in the header. Notebook/new-chat handlers stay
-         wired in script (functionality preserved) but render nothing here. -->
-    <div class="top-spacer" aria-hidden="true"></div>
+    <div class="top-spacer">
+      <label v-if="notebooks.length > 0" class="nb-label" for="nb-select">Recent Notebooks</label>
+      <select
+        v-if="notebooks.length > 0"
+        id="nb-select"
+        ref="notebookSelectRef"
+        class="nb-select"
+        :value="currentNotebookId"
+        aria-label="Select notebook"
+        title="Select notebook"
+        @change="$emit('select-notebook', Number($event.target.value))"
+      >
+        <option v-for="nb in notebooks" :key="nb.id" :value="nb.id">
+          {{ nb.name }}
+        </option>
+      </select>
+      <span v-if="username" class="user-name" :title="`Logged in as ${username}`">{{ username }}</span>
+      <button v-if="username" class="logout-btn" @click="$emit('logout')" title="Log out">
+        Log out
+      </button>
+    </div>
   </header>
 </template>
 
@@ -60,9 +56,13 @@ defineProps({
     type: [Number, null],
     required: true,
   },
+  username: {
+    type: String,
+    default: '',
+  },
 });
 
-const emit = defineEmits(['select-notebook', 'create-notebook', 'new-chat', 'nav-chat', 'nav-notebook', 'nav-documents']);
+const emit = defineEmits(['select-notebook', 'create-notebook', 'logout', 'new-chat', 'nav-chat', 'nav-notebook', 'nav-documents']);
 
 const notebookSelectRef = ref(null);
 
@@ -214,5 +214,64 @@ defineExpose({ focusNotebookSelect });
 .top-spacer {
   justify-self: end;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.nb-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.nb-select {
+  height: 36px;
+  max-width: 170px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  padding: 0 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+.nb-select:focus {
+  border-color: var(--accent);
+}
+
+.user-name {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-btn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.logout-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 </style>
